@@ -80,19 +80,24 @@ entrez_search <- function(db, term, config=NULL, retmode="xml", use_history=FALS
 }
 
 
-parse_esearch <- function(x, history) UseMethod("parse_esearch")
+parse_esearch <- function(x, history, rettype = NULL) UseMethod("parse_esearch")
    
-parse_esearch.XMLInternalDocument <- function(x, history){
-    res <- list( ids      = xpathSApply(x, "//IdList/Id", xmlValue),
-                 count    = as.integer(xmlValue(x[["/eSearchResult/Count"]])),
-                 retmax   = as.integer(xmlValue(x[["/eSearchResult/RetMax"]])),
-                 QueryTranslation   = xmlValue(x[["/eSearchResult/QueryTranslation"]]),
-                 file     = x)
-    if(history){
-        res$web_history = web_history(
-          QueryKey = xmlValue(x[["/eSearchResult/QueryKey"]]),
-          WebEnv   = xmlValue(x[["/eSearchResult/WebEnv"]])
-        )
+parse_esearch.XMLInternalDocument <- function(x, history, rettype = NULL){
+    if(rettype == "count"){
+        res <- list( count    = as.integer(xmlValue(x[["/eSearchResult/Count"]])),
+                     file     = x)
+    } else {
+        res <- list( ids      = xpathSApply(x, "//IdList/Id", xmlValue),
+                     count    = as.integer(xmlValue(x[["/eSearchResult/Count"]])),
+                     retmax   = as.integer(xmlValue(x[["/eSearchResult/RetMax"]])),
+                     QueryTranslation   = xmlValue(x[["/eSearchResult/QueryTranslation"]]),
+                     file     = x)
+        if(history){
+            res$web_history = web_history(
+                QueryKey = xmlValue(x[["/eSearchResult/QueryKey"]]),
+                WebEnv   = xmlValue(x[["/eSearchResult/WebEnv"]])
+            )
+        }
     }
     class(res) <- c("esearch", "list")
     return(res)
@@ -116,13 +121,17 @@ parse_esearch.list <- function(x, history){
 
 #'@export
 print.esearch <- function(x, ...){
-    display_term <- if(nchar(x$QueryTranslation) > 50){
-        paste(substr(x$QueryTranslation, 1, 50), "...")
-    } else x$QueryTranslation
-    cookie_word <- if("web_history" %in% names(x)) "a" else "no"
-    msg<- paste("Entrez search result with", x$count, "hits (object contains",
-                length(x$ids), "IDs and", cookie_word, 
-                "web_history object)\n Search term (as translated): "  , display_term, "\n")
+    if(all(c(names(x)) %in% c("count", "file"))){
+        msg <- paste("Entrez search result with", x$count, "hits")
+    } else {
+        display_term <- if(nchar(x$QueryTranslation) > 50){
+            paste(substr(x$QueryTranslation, 1, 50), "...")
+        } else x$QueryTranslation
+        cookie_word <- if("web_history" %in% names(x)) "a" else "no"
+        msg<- paste("Entrez search result with", x$count, "hits (object contains",
+                    length(x$ids), "IDs and", cookie_word, 
+                    "web_history object)\n Search term (as translated): "  , display_term, "\n")
+    }
     cat(msg)
 }
 
